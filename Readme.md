@@ -6,6 +6,7 @@
 Allows you to easily execute SQL against structured text like CSV or TSV.
 
 Example session:
+
 ![textql_usage_session](https://raw.github.com/dinedal/textql/master/textql_usage.gif)
 
 ## Major changes!
@@ -53,9 +54,17 @@ Bug fixes:
 
 ## Requirements
 
-- Go
+- Go 1.4 or later
 
 ## Install
+
+Latest release on Homebrew (OS X)
+
+```bash
+brew install textql
+```
+
+Build from source
 
 ```bash
 go get -u github.com/dinedal/textql/...
@@ -64,26 +73,28 @@ go get -u github.com/dinedal/textql/...
 ## Usage
 
 ```bash
-  textql [-console] [-save-to path path] [-output-file path] [-output-dlm delimter] [-output-header] [-header] [-dlm delimter] [-source path] [-sql sql_statements] [-quiet] [path ...]
+  textql [-console] [-save-to path path] [-output-file path] [-output-dlm delimter] [-output-header] [-pretty] [-quiet] [-header] [-dlm delimter] [-sql sql_statements] [path ...]
 
   -console
-        After all commands are run, open sqlite3 console with this data
+        After all statements are run, open SQLite3 REPL with this data
   -dlm string
-        Input delimiter between fields -dlm=tab for tab, -dlm=0x## to specify a character code in hex (default ",")
+        Input delimiter character between fields -dlm=tab for tab, -dlm=0x## to specify a character code in hex (default ",")
   -header
-        Treat file as having the first row as a header row
+        Treat input files as having the first row as a header row
   -output-dlm string
-        Output delimiter between fields -output-dlm=tab for tab, -dlm=0x## to specify a character code in hex (default ",")
-  -output-file string
+        Output delimiter character between fields -output-dlm=tab for tab, -dlm=0x## to specify a character code in hex (default ",")
+  -output-file file
         Filename to write output to, if empty no output is written (default "stdout")
   -output-header
         Display column names in output
   -quiet
         Surpress logging
-  -save-to string
-        If set, sqlite3 db is left on disk at this path
+  -pretty
+        Pretty print output
+  -save-to file
+        SQLite3 db is left on disk at this file
   -sql string
-        SQL Command(s) to run on the data
+        SQL Statement(s) to run on the data
   -version
         Print version and exit
 ```
@@ -91,6 +102,6 @@ go get -u github.com/dinedal/textql/...
 
 ## License
 
-New MIT License - Copyright (c) 2014, 2015 Paul Bergeron
+New MIT License - Copyright (c) 2015, 2016 Paul Bergeron [http://pauldbergeron.com/](http://pauldbergeron.com/)
 
 See LICENSE for details

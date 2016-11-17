@@ -16,7 +16,7 @@ import (
 )
 
 type commandLineOptions struct {
-	Commands        *string
+	Statements      *string
 	SourceFile      *string
 	Delimiter       *string
 	Header          *bool
@@ -27,6 +27,7 @@ type commandLineOptions struct {
 	Console         *bool
 	Version         *bool
 	Quiet           *bool
+	Pretty          *bool
 }
 
 // Must be set at build via -ldflags "-X main.VERSION=`cat VERSION`"
@@ -34,24 +35,25 @@ var VERSION string
 
 func newCommandLineOptions() *commandLineOptions {
 	cmdLineOpts := commandLineOptions{}
-	cmdLineOpts.Commands = flag.String("sql", "", "SQL Command(s) to run on the data")
-	cmdLineOpts.Delimiter = flag.String("dlm", ",", "Input delimiter between fields -dlm=tab for tab, -dlm=0x## to specify a character code in hex")
-	cmdLineOpts.Header = flag.Bool("header", false, "Treat file as having the first row as a header row")
+	cmdLineOpts.Statements = flag.String("sql", "", "SQL Statement(s) to run on the data")
+	cmdLineOpts.Delimiter = flag.String("dlm", ",", "Input delimiter character between fields -dlm=tab for tab, -dlm=0x## to specify a character code in hex")
+	cmdLineOpts.Header = flag.Bool("header", false, "Treat input files as having the first row as a header row")
 	cmdLineOpts.OutputHeader = flag.Bool("output-header", false, "Display column names in output")
-	cmdLineOpts.OutputDelimiter = flag.String("output-dlm", ",", "Output delimiter between fields -output-dlm=tab for tab, -dlm=0x## to specify a character code in hex")
+	cmdLineOpts.OutputDelimiter = flag.String("output-dlm", ",", "Output delimiter character between fields -output-dlm=tab for tab, -dlm=0x## to specify a character code in hex")
 	cmdLineOpts.OutputFile = flag.String("output-file", "stdout", "Filename to write output to, if empty no output is written")
-	cmdLineOpts.SaveTo = flag.String("save-to", "", "If set, sqlite3 db is left on disk at this path")
-	cmdLineOpts.Console = flag.Bool("console", false, "After all commands are run, open sqlite3 console with this data")
+	cmdLineOpts.SaveTo = flag.String("save-to", "", "SQLite3 db is left on disk at this file")
+	cmdLineOpts.Console = flag.Bool("console", false, "After all statements are run, open SQLite3 REPL with this data")
 	cmdLineOpts.Version = flag.Bool("version", false, "Print version and exit")
 	cmdLineOpts.Quiet = flag.Bool("quiet", false, "Surpress logging")
+	cmdLineOpts.Pretty = flag.Bool("pretty", false, "Output pretty formatting")
 	flag.Usage = cmdLineOpts.Usage
 	flag.Parse()
 
 	return &cmdLineOpts
 }
 
-func (clo *commandLineOptions) GetCommands() string {
-	return *clo.Commands
+func (clo *commandLineOptions) GetStatements() string {
+	return *clo.Statements
 }
 
 func (clo *commandLineOptions) GetSourceFiles() []string {
@@ -94,11 +96,15 @@ func (clo *commandLineOptions) GetQuiet() bool {
 	return *clo.Quiet
 }
 
+func (clo *commandLineOptions) GetPretty() bool {
+	return *clo.Pretty
+}
+
 func (clo *commandLineOptions) Usage() {
 	if !clo.GetQuiet() {
 		fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "\n")
-		fmt.Fprintf(os.Stderr, "  %s [-console] [-save-to path path] [-output-file path] [-output-dlm delimter] [-output-header] [-header] [-dlm delimter] [-source path] [-sql sql_statements] [-quiet] [path ...] \n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s [-console] [-save-to path path] [-output-file path] [-output-dlm delimter] [-output-header] [-pretty] [-quiet] [-header] [-dlm delimter] [-sql sql_statements] [path ...] \n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "\n")
 		flag.PrintDefaults()
 	}
@@ -167,20 +173,33 @@ func main() {
 		storage.LoadInput(input)
 	}
 
-	sqlStrings := strings.Split(cmdLineOpts.GetCommands(), ";")
+	sqlStrings := strings.Split(cmdLineOpts.GetStatements(), ";")
 
 	if cmdLineOpts.GetOutputFile() != "" {
-		displayOpts := &outputs.CSVOutputOptions{
-			WriteHeader: cmdLineOpts.GetOutputHeader(),
-			Seperator:   util.DetermineSeparator(cmdLineOpts.GetOutputDelimiter()),
-			WriteTo:     util.OpenFileOrStdDev(cmdLineOpts.GetOutputFile(), true),
-		}
+		if cmdLineOpts.GetPretty() {
+			displayOpts := &outputs.PrettyCSVOutputOptions{
+				WriteHeader: cmdLineOpts.GetOutputHeader(),
+				WriteTo:     util.OpenFileOrStdDev(cmdLineOpts.GetOutputFile(), true),
+			}
 
-		outputer = outputs.NewCSVOutput(displayOpts)
+			outputer = outputs.NewPrettyCSVOutput(displayOpts)
+		} else {
+			displayOpts := &outputs.CSVOutputOptions{
+				WriteHeader: cmdLineOpts.GetOutputHeader(),
+				Seperator:   util.DetermineSeparator(cmdLineOpts.GetOutputDelimiter()),
+				WriteTo:     util.OpenFileOrStdDev(cmdLineOpts.GetOutputFile(), true),
+			}
+
+			outputer = outputs.NewCSVOutput(displayOpts)
+		}
 	}
 
 	for _, sqlQuery := range sqlStrings {
-		queryResults := storage.ExecuteSQLString(sqlQuery)
+		queryResults, queryErr := storage.ExecuteSQLString(sqlQuery)
+
+		if queryErr != nil {
+			log.Fatalln(queryErr)
+		}
 
 		if queryResults != nil && cmdLineOpts.GetOutputFile() != "" {
 			outputer.Show(queryResults)
